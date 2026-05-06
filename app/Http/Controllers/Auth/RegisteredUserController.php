@@ -31,21 +31,45 @@ class RegisteredUserController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
+            'name'     => ['required', 'string', 'max:255'],
+            'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'rol'      => ['required', 'in:instructor,aprendiz'],
         ]);
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
+            'name'     => $request->name,
+            'email'    => $request->email,
             'password' => Hash::make($request->password),
+            'rol'      => $request->rol,
         ]);
 
-        event(new Registered($user));
+        // Crear perfil según rol
+        if ($request->rol === 'instructor') {
+            \App\Models\Instructor::create([
+                'numdoc_instructor'    => 'pendiente',
+                'nombres_instructor'   => $request->name,
+                'apellidos_instructor' => '',
+                'correo_instructor'    => $request->email,
+                'users_id'             => $user->id,
+            ]);
+        } else {
+            \App\Models\Aprendiz::create([
+                'numdoc_aprendiz'    => 'pendiente',
+                'nombres_aprendiz'   => $request->name,
+                'apellidos_aprendiz' => '',
+                'correo_aprendiz'    => $request->email,
+                'users_id'           => $user->id,
+            ]);
+        }
 
+        event(new Registered($user));
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        if ($user->rol === 'instructor') {
+            return redirect()->route('instructor.dashboard');
+        }
+
+        return redirect()->route('aprendiz.dashboard');
     }
 }
